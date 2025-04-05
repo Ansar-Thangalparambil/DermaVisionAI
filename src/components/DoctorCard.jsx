@@ -1,19 +1,19 @@
-const DoctorCard = () => (
+const DoctorCard = ({ admin = false, name, ImageUrl, Specialty }) => (
   <div className="py-5 px-4 shadow-md border border-gray-100 flex-col rounded-lg flex">
     <div className="flex gap-x-3">
       <div className="w-20 h-20 overflow-hidden rounded-lg">
         <img
-          src="/doctor.jpeg"
+          src={ImageUrl || "/doctor.jpeg"}
           alt="Doctor"
           className="w-full h-full object-cover"
         />
       </div>
       <div className="flex flex-col gap-y-1.5">
-        <h4 className="font-medium">Dr. Aswin Mananath</h4>
+        <h4 className="font-medium">{name || "Dr. Aswin Mananath"}</h4>
         <div className="flex items-center gap-x-2">
           <img src="/icons/dr.svg" alt="Specialty" />
           <span className="text-sm text-gray-500 font-medium">
-            General Physician
+            {Specialty || "General Physician"}
           </span>
         </div>
         <div className="flex items-center gap-x-2">
@@ -27,9 +27,11 @@ const DoctorCard = () => (
         </div>
       </div>
     </div>
-    <span className="mt-4 font-medium text-green-600 text-sm">
-      Available Now
-    </span>
+    {!admin && (
+      <span className="mt-4 font-medium text-green-600 text-sm">
+        Available Now
+      </span>
+    )}
   </div>
 );
 

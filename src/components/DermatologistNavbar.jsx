@@ -1,17 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-const Navbar = () => {
+const DermNavabar = () => {
   const [isMenuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const [userInfo, setUserInfo] = useState(null);
 
   useEffect(() => {
     // Parse user info from localStorage
-    const storedUserInfo = localStorage.getItem("userInfo");
+    const storedUserInfo = localStorage.getItem("dermatologistToken");
     if (storedUserInfo) {
       try {
-        setUserInfo(JSON.parse(storedUserInfo));
+        setUserInfo(JSON.parse(storedUserInfo)[0]);
+        console.log(JSON.parse(storedUserInfo)[0]);
       } catch (error) {
         console.error("Error parsing user info:", error);
       }
@@ -32,8 +33,8 @@ const Navbar = () => {
 
   const handleLogout = () => {
     // Clear user info from localStorage
-    localStorage.removeItem("userInfo");
-    navigate("/login");
+    localStorage.removeItem("dermatologistToken");
+    navigate("/dermoLogin");
   };
 
   const handleDeleteAccount = () => {
@@ -47,18 +48,24 @@ const Navbar = () => {
       <img src="/logo.svg" alt="Logo" />
 
       <ul className="flex items-center text-sm justify-center font-medium gap-x-10">
-        <Link to={"/"} className="hover:text-[#333333]/60 cursor-pointer">
+        {/* <Link
+          to={"/dermotolgist"}
+          className="hover:text-[#333333]/60 cursor-pointer"
+        >
           Home
-        </Link>
-        <Link
-          to={"/appointments"}
+        </Link> */}
+        {/* <Link
+          to={"/dermotolgist/appointments"}
           className="hover:text-[#333333]/60 cursor-pointer"
         >
           Appointments
-        </Link>
-        <Link to={"/help"} className="hover:text-[#333333]/60 cursor-pointer">
-          Help
-        </Link>
+        </Link> */}
+        {/* <Link
+          to={"/dermotolgist/notification"}
+          className="hover:text-[#333333]/60 cursor-pointer"
+        >
+          Notification
+        </Link> */}
       </ul>
 
       <div className="flex gap-x-2 relative items-center justify-end">
@@ -69,13 +76,21 @@ const Navbar = () => {
                 {userInfo?.FullName || "User"}
               </h4>
               <span className="text-xs text-[#333333]">
-                {userInfo?.Email || "user@example.com"}
+                {userInfo?.PortalLoginID || "user@example.com"}
               </span>
             </div>
             <div
               onClick={() => setMenuOpen(!isMenuOpen)}
-              className="w-8 h-8 rounded-full bg-[#D9D9D9]"
-            ></div>
+              className="w-8 h-8 rounded-full bg-[#D9D9D9] overflow-hidden"
+            >
+              {userInfo?.ImageUrl && (
+                <img
+                  src={userInfo?.ImageUrl}
+                  alt=""
+                  className="w-full h-full object-cover object-top"
+                />
+              )}
+            </div>
           </>
         ) : (
           <Link
@@ -99,13 +114,6 @@ const Navbar = () => {
               <img src="/icons/logout.svg" alt="Logout" />
               <span className="text-sm">Logout</span>
             </li>
-            <li
-              onClick={handleDeleteAccount}
-              className="flex items-center cursor-pointer py-4 gap-x-2 w-full"
-            >
-              <img src="/icons/trash.svg" alt="Delete Account" />
-              <span className="text-sm text-[#EF4444]">Delete Account</span>
-            </li>
           </div>
         )}
       </div>
@@ -113,4 +121,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar;
+export default DermNavabar;
