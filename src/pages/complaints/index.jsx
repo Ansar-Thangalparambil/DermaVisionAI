@@ -36,9 +36,13 @@ const Complaints = () => {
         throw new Error("User ID not found. Please log in again.");
       }
 
-      const response = await apiClent.post("/api/7788/getComplient", {
-        headers: { UserID: userId },
-      });
+      const response = await apiClent.post(
+        "/api/7788/getComplient",
+        {},
+        {
+          headers: { UserID: userId },
+        }
+      );
 
       if (response.data && response.data.isSucess) {
         setComplaints(response.data.data || []);

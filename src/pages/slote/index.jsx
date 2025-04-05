@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AppointmentSuccessModal from "../../components/AppointmentSuccessModal";
 import apiClent from "../../api/client";
@@ -22,6 +22,10 @@ const SlotBooking = () => {
     skinImage: null,
     diagnosisResult: "",
   });
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   const navigate = useNavigate();
   const { doctorId } = useParams();
@@ -44,6 +48,65 @@ const SlotBooking = () => {
       loadData();
     }
   }, [doctorId]);
+
+  // Camera handling
+  useEffect(() => {
+    if (showCameraModal) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+  }, [showCameraModal]);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      alert("Could not access camera. Please check permissions.");
+      setShowCameraModal(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+    }
+  };
+
+  const captureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext("2d");
+
+      // Set canvas dimensions to match video stream
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // Draw video frame to canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Convert canvas to blob
+      canvas.toBlob(
+        async (blob) => {
+          if (blob) {
+            const file = new File([blob], "captured-image.jpg", {
+              type: "image/jpeg",
+            });
+            setPatientDetails((prev) => ({ ...prev, skinImage: file }));
+            setShowCameraModal(false);
+            await diagnoseSkinImage(file);
+          }
+        },
+        "image/jpeg",
+        0.9
+      );
+    }
+  };
 
   // API calls
   const fetchDoctorDetails = async () => {
@@ -71,8 +134,6 @@ const SlotBooking = () => {
 
       if (response.data.isSucess) {
         setAvailableSlots(response.data.data);
-
-        // Extract unique days of week
         const uniqueDays = [
           ...new Set(response.data.data.map((slot) => slot.day_of_week)),
         ];
@@ -141,7 +202,7 @@ const SlotBooking = () => {
     }
   };
 
-  const handleAppointmentBooking = async (paymentRef) => {
+  const handleAppointmentBooking = async (paymentRef, paymentAmount = 500) => {
     try {
       const userInfo = JSON.parse(localStorage.getItem("userInfo"));
 
@@ -162,8 +223,8 @@ const SlotBooking = () => {
         patientName: patientDetails.name,
         patientID: userInfo.UserID,
         bookStatus: "Pending",
-        paymentAmount: 500,
-        paymentRef: paymentRef || "123",
+        paymentAmount: paymentAmount,
+        paymentRef: paymentRef || "no-payment-ref",
         diesesDescription:
           patientDetails.description || patientDetails.diagnosisResult || "",
         diesesImageUrl: imageUrl || "",
@@ -239,10 +300,35 @@ const SlotBooking = () => {
       (slot) => slot.day_of_week === selectedDate
     );
 
-    return daySlots.map((slot) => ({
-      time: slot.start_time,
-      availabilityId: slot.availability_id,
+    // Group slots by time and show availability
+    const groupedSlots = daySlots.reduce((acc, slot) => {
+      const timeKey = slot.start_time;
+      if (!acc[timeKey]) {
+        acc[timeKey] = {
+          time: slot.start_time,
+          availabilityId: slot.availability_id,
+          count: 0,
+        };
+      }
+      acc[timeKey].count++;
+      return acc;
+    }, {});
+
+    return Object.values(groupedSlots).map((slot) => ({
+      ...slot,
+      isPopular: slot.count > 2, // Mark as popular if multiple slots available
     }));
+  };
+
+  // Event handlers for payment options
+  const handlePaymentOption = (option) => {
+    setShowPaymentModal(false);
+
+    if (option === "online") {
+      handleRazorpayPayment();
+    } else {
+      handleAppointmentBooking("normal-booking", 0);
+    }
   };
 
   // Event handlers
@@ -252,8 +338,7 @@ const SlotBooking = () => {
     } else if (level === "time") {
       setLevel("notes");
     } else {
-      // Proceed to payment
-      handleRazorpayPayment();
+      setShowPaymentModal(true);
     }
   };
 
@@ -268,6 +353,10 @@ const SlotBooking = () => {
       setPatientDetails((prev) => ({ ...prev, skinImage: file }));
       await diagnoseSkinImage(file);
     }
+  };
+
+  const openCamera = () => {
+    setShowCameraModal(true);
   };
 
   // Validation
@@ -342,9 +431,29 @@ const SlotBooking = () => {
             setPatientDetails={setPatientDetails}
             handleImageUpload={handleImageUpload}
             isProcessingImage={isProcessingImage}
+            openCamera={openCamera}
           />
         )}
       </div>
+
+      {/* Camera Modal */}
+      {showCameraModal && (
+        <CameraModal
+          videoRef={videoRef}
+          canvasRef={canvasRef}
+          onCapture={captureImage}
+          onClose={() => setShowCameraModal(false)}
+        />
+      )}
+
+      {/* Payment Option Modal */}
+      {showPaymentModal && (
+        <PaymentOptionModal
+          doctorName={doctorDetails?.FullName}
+          onClose={() => setShowPaymentModal(false)}
+          onSelectOption={handlePaymentOption}
+        />
+      )}
 
       {/* Success Modal */}
       <AppointmentSuccessModal
@@ -389,7 +498,7 @@ const SlotBooking = () => {
             Processing...
           </>
         ) : level === "notes" ? (
-          "Proceed to Payment"
+          "Continue to Booking"
         ) : (
           "Continue"
         )}
@@ -398,7 +507,77 @@ const SlotBooking = () => {
   );
 };
 
-// Component for displaying doctor information
+// Camera Modal Component
+const CameraModal = ({ videoRef, canvasRef, onCapture, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-fadeIn overflow-hidden">
+        <div className="p-4 bg-gray-100 border-b flex justify-between items-center">
+          <h3 className="font-medium">Take a Photo</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div className="relative bg-black">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            className="w-full h-auto max-h-[70vh] object-contain"
+          />
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+
+        <div className="p-4 bg-gray-50 flex justify-center">
+          <button
+            onClick={onCapture}
+            className="p-3 bg-red-500 rounded-full hover:bg-red-600 transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-8 w-8 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Doctor Information Card
 const DoctorInfoCard = ({ doctorDetails }) => (
   <div className="py-5 px-4 shadow-md border border-gray-100 flex-col rounded-lg flex">
     <div className="flex gap-x-3">
@@ -422,44 +601,183 @@ const DoctorInfoCard = ({ doctorDetails }) => (
   </div>
 );
 
-// Date Selection Component
-const DateSelection = ({ dateOptions, selected, setSelected }) => (
-  <>
-    <h4 className="text-lg font-medium mt-6">Choose Your Appointment Date</h4>
-    <div className="flex flex-wrap items-center justify-between gap-2 mt-4">
-      <div className="flex flex-wrap gap-2">
-        {dateOptions.map((date, index) => (
-          <DateButton
-            key={index}
-            date={date}
-            isSelected={selected === date}
-            onClick={() => setSelected(date)}
-          />
-        ))}
+// Payment Option Modal Component
+const PaymentOptionModal = ({ doctorName, onClose, onSelectOption }) => {
+  return (
+    <div className="fixed inset-0 bg-black/20 bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-fadeIn">
+        <div className="p-6">
+          <h3 className="text-xl font-medium text-gray-900 mb-4">
+            Select Booking Option
+          </h3>
+          <p className="text-gray-600 mb-6">
+            How would you like to proceed with your appointment with Dr.{" "}
+            {doctorName}?
+          </p>
+
+          <div className="space-y-4">
+            <button
+              onClick={() => onSelectOption("online")}
+              className="w-full p-4 border border-blue-500 bg-blue-50 rounded-lg text-blue-700 font-medium hover:bg-blue-100 transition flex items-center justify-between"
+            >
+              <span className="flex items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                  />
+                </svg>
+                Online Payment
+              </span>
+              <span className="text-sm">₹500.00</span>
+            </button>
+
+            <button
+              onClick={() => onSelectOption("normal")}
+              className="w-full p-4 border border-gray-300 bg-gray-50 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition flex items-center justify-between"
+            >
+              <span className="flex items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                Normal Booking
+              </span>
+              <span className="text-sm">Pay at Clinic</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 font-medium text-sm"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
-  </>
-);
+  );
+};
+
+// Date Selection Component
+const DateSelection = ({ dateOptions, selected, setSelected }) => {
+  const daysOfWeek = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+
+  // Get next 7 days with their day names
+  const nextSevenDays = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+    return {
+      date: date,
+      dayName: daysOfWeek[date.getDay()],
+      formattedDate: `${daysOfWeek[date.getDay()].substring(
+        0,
+        3
+      )}, ${date.getDate()} ${date.toLocaleString("default", {
+        month: "short",
+      })}`,
+    };
+  });
+
+  // Filter to only show available days
+  const availableDates = nextSevenDays.filter((day) =>
+    dateOptions.includes(day.dayName)
+  );
+
+  return (
+    <>
+      <h4 className="text-lg font-medium mt-6">Choose Your Appointment Date</h4>
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-4">
+        <div className="flex flex-wrap gap-2">
+          {availableDates.map((day, index) => (
+            <DateButton
+              key={index}
+              date={day.formattedDate}
+              isSelected={selected === day.dayName}
+              onClick={() => setSelected(day.dayName)}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+};
 
 // Time Selection Component
-const TimeSelection = ({ timeSlots, selected, onSelect }) => (
-  <>
-    <h4 className="text-lg font-medium mt-6">Choose Your Appointment Time</h4>
-    <div className="flex flex-wrap gap-2 mt-4">
-      {timeSlots.map((slot, index) => (
-        <TimeButton
-          key={index}
-          time={slot.time}
-          isSelected={selected === slot.time}
-          onClick={() => onSelect(slot.time, slot.availabilityId)}
-        />
-      ))}
-    </div>
-    {timeSlots.length === 0 && (
-      <p className="text-red-500 mt-4">No available time slots for this day</p>
-    )}
-  </>
-);
+const TimeSelection = ({ timeSlots, selected, onSelect }) => {
+  // Group time slots by morning/afternoon/evening
+  const groupedSlots = timeSlots.reduce((acc, slot) => {
+    const hour = parseInt(slot.time.split(":")[0]);
+    let period = "";
+
+    if (hour < 12) period = "Morning";
+    else if (hour < 17) period = "Afternoon";
+    else period = "Evening";
+
+    if (!acc[period]) {
+      acc[period] = [];
+    }
+    acc[period].push(slot);
+    return acc;
+  }, {});
+
+  return (
+    <>
+      <h4 className="text-lg font-medium mt-6">Choose Your Appointment Time</h4>
+      <div className="mt-4 space-y-6">
+        {Object.entries(groupedSlots).map(([period, slots]) => (
+          <div key={period}>
+            <h5 className="text-sm font-medium text-gray-500 mb-2">{period}</h5>
+            <div className="flex flex-wrap gap-2">
+              {slots.map((slot, index) => (
+                <TimeButton
+                  key={index}
+                  time={slot.time}
+                  isSelected={selected === slot.time}
+                  isPopular={slot.isPopular}
+                  onClick={() => onSelect(slot.time, slot.availabilityId)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {timeSlots.length === 0 && (
+        <p className="text-red-500 mt-4">
+          No available time slots for this day
+        </p>
+      )}
+    </>
+  );
+};
 
 // Patient Details Form Component
 const PatientDetailsForm = ({
@@ -467,6 +785,7 @@ const PatientDetailsForm = ({
   setPatientDetails,
   handleImageUpload,
   isProcessingImage,
+  openCamera,
 }) => (
   <div>
     <h4 className="text-lg font-medium mt-6">Patient Details</h4>
@@ -488,13 +807,27 @@ const PatientDetailsForm = ({
         <label className="block text-sm font-medium text-gray-700">
           Upload Skin Image for Diagnosis
         </label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleImageUpload}
-          className="w-full px-4 py-2 border rounded-lg"
-          disabled={isProcessingImage}
-        />
+        <div className="flex gap-2">
+          <label className="flex-1">
+            <div className="px-4 py-2 border rounded-lg bg-white hover:bg-gray-50 cursor-pointer text-center">
+              Choose File
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+                disabled={isProcessingImage}
+              />
+            </div>
+          </label>
+          <button
+            onClick={openCamera}
+            disabled={isProcessingImage}
+            className="flex-1 px-4 py-2 border rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Use Camera
+          </button>
+        </div>
 
         {patientDetails.skinImage && (
           <div className="mt-2">
@@ -572,10 +905,10 @@ const DateButton = ({ date, isSelected, onClick }) => (
 );
 
 // Reusable time button component
-const TimeButton = ({ time, isSelected, onClick }) => (
+const TimeButton = ({ time, isSelected, onClick, isPopular }) => (
   <button
     onClick={onClick}
-    className={`px-4 py-2.5 text-sm rounded-lg border-2 cursor-pointer transition-colors
+    className={`px-4 py-2.5 text-sm rounded-lg border-2 cursor-pointer transition-colors relative
       ${
         isSelected
           ? "border-gray-500/70 text-gray-500 bg-gray-100"
@@ -583,6 +916,11 @@ const TimeButton = ({ time, isSelected, onClick }) => (
       }`}
   >
     {time}
+    {isPopular && !isSelected && (
+      <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+        Popular
+      </span>
+    )}
   </button>
 );
 

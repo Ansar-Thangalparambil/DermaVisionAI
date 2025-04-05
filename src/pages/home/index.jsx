@@ -98,7 +98,7 @@ const Home = () => {
                   </div>
                 </div>
               </div>
-              <span className="text-sm font-medium text-[#229B59]">Online</span>
+              {/* <span className="text-sm font-medium text-[#229B59]">Online</span> */}
             </Link>
           ))}
         </div>
