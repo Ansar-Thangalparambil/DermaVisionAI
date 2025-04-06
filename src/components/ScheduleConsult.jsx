@@ -9,7 +9,8 @@ const ScheduleConsult = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [bookingDetails, setBookingDetails] = useState(null);
-
+  const dermoId = JSON.parse(localStorage.getItem("dermatologistToken"))?.[0]
+    ?.DermatologistID;
   // Form state
   const [meetingLink, setMeetingLink] = useState("");
   const [meetingScheduledTime, setMeetingScheduledTime] = useState("");
@@ -28,7 +29,7 @@ const ScheduleConsult = () => {
           "/api/7788/getDermatologistDashBoard",
           {
             headers: {
-              ID: localStorage.getItem("dermatologistId") || 12,
+              ID: dermoId,
             },
           }
         );
@@ -50,7 +51,7 @@ const ScheduleConsult = () => {
             setBookingDetails(booking);
 
             // Pre-fill the meeting link if it exists
-            if (booking.google_meet_link) {
+            if (booking?.google_meet_link) {
               setMeetingLink(booking.google_meet_link);
             }
 
@@ -134,7 +135,7 @@ const ScheduleConsult = () => {
 
       const prescriptionData = {
         bookingId: parseInt(bookingId),
-        dermatologistId: parseInt(dermatologistId),
+        dermatologistId: dermoId,
         patientName: bookingDetails?.patient_name || "",
         meetingLink,
         meetingSheduledTime: meetingScheduledTime,
@@ -151,7 +152,7 @@ const ScheduleConsult = () => {
         setSuccess(true);
         // Redirect after a short delay
         setTimeout(() => {
-          navigate("/dashboard");
+          navigate("/dermotolgist");
         }, 2000);
       } else {
         setError(response.data?.message || "Failed to schedule consultation");
@@ -296,6 +297,16 @@ const ScheduleConsult = () => {
                   </div>
                 </div>
               </div>
+            )}
+            {bookingDetails?.diagonisisResult && (
+              <>
+                <div className="flex flex-col mb-5">
+                  <h2 className="text-lg font-semibold ">Diagonise Result</h2>
+                  <p className="text-yellow-500 mt-1">
+                    {bookingDetails.diagonisisResult}
+                  </p>
+                </div>
+              </>
             )}
 
             {/* Meeting Details */}

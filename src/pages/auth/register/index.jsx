@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import apiClent from "../../../api/client";
+import { LuScanFace } from "react-icons/lu";
 
 const Register = () => {
   const [apiError, setApiError] = useState("");
@@ -30,6 +31,13 @@ const Register = () => {
     confirmPassword: Yup.string()
       .required("Confirm Password is required")
       .oneOf([Yup.ref("password"), null], "Passwords must match"),
+
+    skinType: Yup.string()
+      .required("Skin Type is required")
+      .oneOf(
+        ["Normal", "Dry", "Oily", "Combination", "Sensitive"],
+        "Please select a valid skin type"
+      ),
   });
 
   // Initial form values
@@ -38,6 +46,7 @@ const Register = () => {
     email: "",
     password: "",
     confirmPassword: "",
+    skinType: "", // Added skin type field
     rememberMe: false,
   };
 
@@ -52,6 +61,7 @@ const Register = () => {
         email: values.email,
         password: values.password,
         userType: "User", // Default user type, adjust as needed
+        skinType: values.skinType, // Added skin type to payload
       };
 
       // Make API call to register
@@ -226,6 +236,37 @@ const Register = () => {
                       />
                       <ErrorMessage
                         name="confirmPassword"
+                        component="div"
+                        className="text-red-500 text-xs mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Skin Type Field */}
+                  <div className="flex flex-col mt-6">
+                    <label className="text-sm text-[#999999]">Skin Type</label>
+                    <div className="relative">
+                      <Field
+                        as="select"
+                        name="skinType"
+                        className={`text-sm placeholder-[#000842] pl-10 border-b-2 w-full outline-none
+                          border-[#000842] p-3 ${
+                            touched.skinType && errors.skinType
+                              ? "border-red-500"
+                              : "border-[#000842]"
+                          }`}
+                      >
+                        <option value="">Select your skin type</option>
+                        <option value="Normal">Normal</option>
+                        <option value="Dry">Dry</option>
+                        <option value="Oily">Oily</option>
+                        <option value="Combination">Combination</option>
+                        <option value="Sensitive">Sensitive</option>
+                      </Field>
+                      <LuScanFace className="absolute top-4 my-auto left-2" />
+
+                      <ErrorMessage
+                        name="skinType"
                         component="div"
                         className="text-red-500 text-xs mt-1"
                       />

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import apiClent from "../../api/client";
+import { Trash2 } from "lucide-react";
 
 const Appointments = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     // Fetch doctors when component mounts
@@ -27,6 +29,47 @@ const Appointments = () => {
       setError("Unable to load doctors. Please try again later.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteDoctor = async (doctorId, event) => {
+    // Stop propagation to prevent navigation
+    event.stopPropagation();
+
+    if (!doctorId) return;
+
+    if (
+      !window.confirm("Are you sure you want to delete this dermatologist?")
+    ) {
+      return;
+    }
+
+    setDeleting(doctorId);
+
+    try {
+      const response = await apiClent.delete("/api/7788/deleteDermatologist", {
+        headers: {
+          DerID: doctorId,
+        },
+      });
+
+      if (response.data && response.data.isSucess) {
+        // Remove the doctor from the state
+        setDoctors(
+          doctors.filter((doctor) => doctor.DermatologistID !== doctorId)
+        );
+      } else {
+        throw new Error(
+          response.data?.message || "Failed to delete dermatologist"
+        );
+      }
+    } catch (err) {
+      console.error("Error deleting dermatologist:", err);
+      alert(
+        err.message || "Unable to delete dermatologist. Please try again later."
+      );
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -63,7 +106,12 @@ const Appointments = () => {
       ) : (
         <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-4">
           {doctors.map((doctor) => (
-            <DoctorCard key={doctor.ID} doctor={doctor} />
+            <DoctorCard
+              key={doctor.DermatologistID || doctor.ID}
+              doctor={doctor}
+              onDelete={handleDeleteDoctor}
+              isDeleting={deleting === doctor.DermatologistID}
+            />
           ))}
         </div>
       )}
@@ -71,7 +119,7 @@ const Appointments = () => {
   );
 };
 
-const DoctorCard = ({ doctor }) => {
+const DoctorCard = ({ doctor, onDelete, isDeleting }) => {
   const navigate = useNavigate();
 
   // Default values in case some properties are missing
@@ -105,8 +153,22 @@ const DoctorCard = ({ doctor }) => {
   return (
     <div
       onClick={() => navigate(`/dashboard/doctor/${DermatologistID}`)}
-      className="py-5 px-4 shadow-md border border-gray-100 cursor-pointer rounded-lg flex justify-between hover:shadow-lg transition-shadow"
+      className="py-5 px-4 shadow-md border border-gray-100 cursor-pointer rounded-lg flex justify-between hover:shadow-lg transition-shadow relative"
     >
+      {/* Delete Button */}
+      <button
+        onClick={(e) => onDelete(DermatologistID, e)}
+        disabled={isDeleting}
+        className="absolute top-4 right-4 p-2 rounded-full hover:bg-red-50 text-red-500 transition-colors"
+        title="Delete Dermatologist"
+      >
+        {isDeleting ? (
+          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-red-500"></div>
+        ) : (
+          <Trash2 size={18} />
+        )}
+      </button>
+
       <div className="flex gap-x-3">
         <div className="w-[80px] h-[80px] overflow-hidden rounded-lg">
           <img
@@ -134,7 +196,7 @@ const DoctorCard = ({ doctor }) => {
         </div>
       </div>
       <span
-        className={`text-sm font-medium ${
+        className={`text-sm font-medium mr-8 ${
           IsOnline ? "text-[#229B59]" : "text-gray-500"
         }`}
       >

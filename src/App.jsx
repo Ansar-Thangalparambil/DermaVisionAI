@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Login from "./pages/auth/login";
 import Register from "./pages/auth/register";
 import Home from "./pages/home";
@@ -63,7 +63,7 @@ function App() {
             </ProtectedRouteForDashboard>
           }
         >
-          <Route index element={<Dashboard />} />
+          <Route index element={<Navigate to={"/dashboard/users"} />} />
           <Route path="users" element={<Users />} />
           <Route path="users/:userId" element={<UserDetails />} />
           <Route path="doctor" element={<Appointments />} />

@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClent from "../../api/client";
+import { Trash2 } from "lucide-react";
 
 const GET_USERS_ENDPOINT = "/api/7788/getUsers";
+const DELETE_USER_ENDPOINT = "/api/7788/deleteUser";
 
 const Users = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -35,6 +38,39 @@ const Users = () => {
     }
   };
 
+  const handleDeleteUser = async (userId, event) => {
+    // Stop propagation to prevent navigation
+    event.stopPropagation();
+
+    if (!userId) return;
+
+    if (!window.confirm("Are you sure you want to delete this user?")) {
+      return;
+    }
+
+    setDeleting(userId);
+
+    try {
+      const response = await apiClent.delete(DELETE_USER_ENDPOINT, {
+        headers: {
+          userID: userId,
+        },
+      });
+
+      if (response.data && response.data.isSucess) {
+        // Remove the user from the state
+        setUsers(users.filter((user) => user.UserID !== userId));
+      } else {
+        throw new Error(response.data?.message || "Failed to delete user");
+      }
+    } catch (err) {
+      console.error("Error deleting user:", err);
+      alert(err.message || "Unable to delete user. Please try again later.");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   return (
     <div className="px-4 py-6 md:px-6 lg:px-8">
       <h1 className="text-2xl font-semibold mb-6">Users</h1>
@@ -52,7 +88,12 @@ const Users = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {users.map((user, index) => (
-            <User key={user.UserID || index} user={user} />
+            <User
+              key={user.UserID || index}
+              user={user}
+              onDelete={handleDeleteUser}
+              isDeleting={deleting === user.UserID}
+            />
           ))}
         </div>
       )}
@@ -60,7 +101,7 @@ const Users = () => {
   );
 };
 
-const User = ({ user }) => {
+const User = ({ user, onDelete, isDeleting }) => {
   const navigate = useNavigate();
 
   // Format date to a readable format
@@ -93,12 +134,34 @@ const User = ({ user }) => {
   };
 
   return (
-    <div
-      onClick={() => navigate(`/dashboard/users/${user.UserID}`)}
-      className="p-5 py-7 flex flex-col cursor-pointer bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200"
-    >
+    <div className="p-5 py-7 flex flex-col relative cursor-pointer bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200">
+      {/* Delete Button */}
+      <button
+        onClick={(e) => onDelete(user.UserID, e)}
+        disabled={isDeleting}
+        className="absolute top-4 right-4 p-2 rounded-full hover:bg-red-50 text-red-500 transition-colors"
+        title="Delete User"
+      >
+        {isDeleting ? (
+          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-red-500"></div>
+        ) : (
+          <Trash2 size={18} />
+        )}
+      </button>
+
       <div className="mb-3">
-        <h3 className="text-lg font-medium text-gray-800">
+        {user.ImageUrl ? (
+          <div className="w-16 h-16 rounded-full overflow-hidden mb-2">
+            <img
+              src={user.ImageUrl}
+              alt={`User ${user.FullName}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="w-16 h-16 bg-gray-200 rounded-full overflow-hidden mb-2"></div>
+        )}
+        <h3 className="text-lg font-medium text-gray-800 pr-8">
           {user.FullName || "Unknown User"}
         </h3>
         <div className="flex mt-2 gap-2">
@@ -125,6 +188,7 @@ const User = ({ user }) => {
       <div className="text-sm text-gray-600">
         <p className="mb-1">{user.Email || "No email provided"}</p>
         <p>Registered: {formatDate(user.CreatedAt)}</p>
+        <p>skinType: {user.SkinType}</p>
       </div>
     </div>
   );

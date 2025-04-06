@@ -161,13 +161,15 @@ const Login = () => {
                   </div>
 
                   {/* Remember Me Checkbox */}
-                  <div className="flex items-center gap-x-2 mt-4">
-                    <Field
-                      type="checkbox"
-                      name="rememberMe"
-                      className="border-2"
-                    />
-                    <span className="font-light text-sm">Remember me</span>
+                  <div className="flex flex-col gap-y-2">
+                    <div className="flex items-center gap-x-2 mt-4">
+                      <Field
+                        type="checkbox"
+                        name="rememberMe"
+                        className="border-2"
+                      />
+                      <span className="font-light text-sm">Remember me</span>
+                    </div>
                   </div>
 
                   {/* Submit Button */}
@@ -178,6 +180,12 @@ const Login = () => {
                   >
                     {isSubmitting ? "Logging in..." : "Login"}
                   </button>
+                  <Link
+                    to={"/dermoLogin"}
+                    className="capitalize hover:text-blue-500 -translate-y-3 hover:underline text-sm "
+                  >
+                    dermatologist Login
+                  </Link>
                 </Form>
               )}
             </Formik>

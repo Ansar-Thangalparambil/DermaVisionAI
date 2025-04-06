@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Formik, Form, Field, ErrorMessage, FieldArray } from "formik";
 import * as Yup from "yup";
-import apiClient from "../../api/client"; // Fixed typo in apiClient
+import apiClient from "../../api/client";
 
 const DAYS_OF_WEEK = [
   "Monday",
@@ -16,6 +16,9 @@ const DAYS_OF_WEEK = [
 
 const DermatologistRegister = () => {
   const [apiError, setApiError] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
   const validationSchema = Yup.object().shape({
@@ -40,9 +43,7 @@ const DermatologistRegister = () => {
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
         "Password must include uppercase, lowercase, number, and special character"
       ),
-    imageUrl: Yup.string()
-      .url("Please enter a valid URL")
-      .required("Image URL is required"),
+    imageUrl: Yup.string().required("Profile image is required"),
     availability: Yup.array()
       .of(
         Yup.object().shape({
@@ -63,10 +64,59 @@ const DermatologistRegister = () => {
       .min(1, "At least one availability slot is required"),
   });
 
+  const handleImageUpload = async (file, setFieldValue) => {
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith("image/")) {
+      setApiError("Please upload an image file");
+      return;
+    }
+
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setApiError("Image must be less than 5MB");
+      return;
+    }
+
+    setIsUploading(true);
+    setApiError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await apiClient.post(
+        "https://asasul-islam-cggqcsa8a9dtghbq.eastus-01.azurewebsites.net/api/8002/upload-image",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (response.data.url) {
+        setImagePreview(response.data.url);
+        setFieldValue("imageUrl", response.data.url);
+      } else {
+        throw new Error("Invalid response from upload API");
+      }
+    } catch (error) {
+      console.error("Image Upload Error:", error);
+      setApiError(
+        error.response?.data?.message ||
+          "Image upload failed. Please try again."
+      );
+      setFieldValue("imageUrl", "");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (values, { setSubmitting }) => {
     setApiError("");
     try {
-      console.log(values.availability);
       const response = await apiClient.post("/api/7788/postDermatologist", {
         fullName: values.fullName,
         contactNo: values.contactNo,
@@ -80,7 +130,7 @@ const DermatologistRegister = () => {
 
       if (response.data) {
         alert("Registration Successful!");
-        navigate("/login");
+        navigate("/dermoLogin");
       }
     } catch (error) {
       setApiError(
@@ -128,7 +178,7 @@ const DermatologistRegister = () => {
               validationSchema={validationSchema}
               onSubmit={handleSubmit}
             >
-              {({ isSubmitting, values }) => (
+              {({ isSubmitting, values, setFieldValue }) => (
                 <Form className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -233,23 +283,42 @@ const DermatologistRegister = () => {
 
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">
-                      Profile Image URL*
+                      Profile Image*
                     </label>
-                    <Field
-                      name="imageUrl"
-                      type="url"
-                      className="w-full border-b-2 p-2 focus:border-[#299392] outline-none"
-                      placeholder="https://example.com/profile.jpg"
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={(e) =>
+                        handleImageUpload(e.target.files[0], setFieldValue)
+                      }
                     />
+                    <div className="flex items-center space-x-4">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current.click()}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded"
+                        disabled={isUploading}
+                      >
+                        {isUploading ? "Uploading..." : "Select Image"}
+                      </button>
+                      <span className="text-sm text-gray-500">
+                        {imagePreview
+                          ? "Image uploaded successfully"
+                          : "No image selected"}
+                      </span>
+                    </div>
+                    <Field type="hidden" name="imageUrl" />
                     <ErrorMessage
                       name="imageUrl"
                       component="div"
                       className="text-red-500 text-xs mt-1"
                     />
-                    {values.imageUrl && (
+                    {imagePreview && (
                       <div className="mt-2">
                         <img
-                          src={values.imageUrl}
+                          src={imagePreview}
                           alt="Profile Preview"
                           className="w-24 h-24 object-cover rounded-full border-2 border-gray-300"
                           onError={(e) => {
@@ -336,7 +405,7 @@ const DermatologistRegister = () => {
 
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isUploading}
                     className="w-full bg-[#299392] text-white py-3 rounded-lg hover:bg-[#1E6F6D] transition-colors mt-6"
                   >
                     {isSubmitting ? "Registering..." : "Complete Registration"}

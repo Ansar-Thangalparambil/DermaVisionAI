@@ -8,6 +8,7 @@ const SlotBooking = () => {
   // State variables
   const [doctorDetails, setDoctorDetails] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
+  const [selectedIsoDate, setSelectedIsoDate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [level, setLevel] = useState("date"); // date -> time -> notes
@@ -26,6 +27,8 @@ const SlotBooking = () => {
   const [showCameraModal, setShowCameraModal] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+
+  useEffect(() => console.log(selectedIsoDate));
 
   const navigate = useNavigate();
   const { doctorId } = useParams();
@@ -214,10 +217,20 @@ const SlotBooking = () => {
         setIsProcessingImage(false);
       }
 
+      const dateStr = selectedIsoDate;
+      const year = 2025;
+
+      // Convert to a Date object
+      const fullDateStr = `${dateStr} ${year}`;
+      const date = new Date(fullDateStr);
+
+      // Format to ISO string (date only part)
+      const isoDate = date.toISOString().split("T")[0] + "T00:00:00";
+      console.log(selectedIsoDate, isoDate);
       const bookingPayload = {
         availabilityId: selectedAvailabilityId,
         dermatologistId: parseInt(doctorId),
-        bookingDate: new Date().toISOString(),
+        bookingDate: isoDate,
         startTime: selectedTimeSlot,
         endTime: calculateEndTime(selectedTimeSlot),
         patientName: patientDetails.name,
@@ -225,8 +238,8 @@ const SlotBooking = () => {
         bookStatus: "Pending",
         paymentAmount: paymentAmount,
         paymentRef: paymentRef || "no-payment-ref",
-        diesesDescription:
-          patientDetails.description || patientDetails.diagnosisResult || "",
+        diagonisisResult: patientDetails.diagnosisResult,
+        diesesDescription: patientDetails.description,
         diesesImageUrl: imageUrl || "",
       };
 
@@ -299,7 +312,7 @@ const SlotBooking = () => {
     const daySlots = availableSlots.filter(
       (slot) => slot.day_of_week === selectedDate
     );
-
+    console.log(availableSlots, selectedDate);
     // Group slots by time and show availability
     const groupedSlots = daySlots.reduce((acc, slot) => {
       const timeKey = slot.start_time;
@@ -410,6 +423,7 @@ const SlotBooking = () => {
         {level === "date" && (
           <DateSelection
             dateOptions={availableDays}
+            setSelectedIsoDate={setSelectedIsoDate}
             selected={selectedDate}
             setSelected={setSelectedDate}
           />
@@ -680,25 +694,26 @@ const PaymentOptionModal = ({ doctorName, onClose, onSelectOption }) => {
 };
 
 // Date Selection Component
-const DateSelection = ({ dateOptions, selected, setSelected }) => {
-  const daysOfWeek = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-  ];
+const DateSelection = ({
+  dateOptions,
+  selected,
+  setSelected,
+  setSelectedIsoDate,
+}) => {
+  // Correct the day name typo from the API
+  const correctedDayNames = dateOptions.map((day) =>
+    day === "Wenesday" ? "Wednesday" : day
+  );
 
   // Get next 7 days with their day names
   const nextSevenDays = Array.from({ length: 7 }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() + i);
+    const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
     return {
       date: date,
-      dayName: daysOfWeek[date.getDay()],
-      formattedDate: `${daysOfWeek[date.getDay()].substring(
+      dayName: dayName,
+      formattedDate: `${dayName.substring(
         0,
         3
       )}, ${date.getDate()} ${date.toLocaleString("default", {
@@ -707,9 +722,9 @@ const DateSelection = ({ dateOptions, selected, setSelected }) => {
     };
   });
 
-  // Filter to only show available days
+  // Filter to only show available days (using corrected day names)
   const availableDates = nextSevenDays.filter((day) =>
-    dateOptions.includes(day.dayName)
+    correctedDayNames.includes(day.dayName)
   );
 
   return (
@@ -722,7 +737,10 @@ const DateSelection = ({ dateOptions, selected, setSelected }) => {
               key={index}
               date={day.formattedDate}
               isSelected={selected === day.dayName}
-              onClick={() => setSelected(day.dayName)}
+              onClick={() => {
+                setSelected(day.dayName);
+                setSelectedIsoDate(day.formattedDate);
+              }}
             />
           ))}
         </div>
@@ -749,6 +767,15 @@ const TimeSelection = ({ timeSlots, selected, onSelect }) => {
     return acc;
   }, {});
 
+  // Function to convert 24hr time to 12hr format
+  const formatTo12Hour = (time) => {
+    const [hour, minute] = time.split(":");
+    const hourNum = parseInt(hour);
+    const amPm = hourNum >= 12 ? "PM" : "AM";
+    const hour12 = hourNum % 12 || 12; // Convert 0 to 12 for 12 AM
+    return `${hour12}:${minute} ${amPm}`;
+  };
+
   return (
     <>
       <h4 className="text-lg font-medium mt-6">Choose Your Appointment Time</h4>
@@ -760,7 +787,7 @@ const TimeSelection = ({ timeSlots, selected, onSelect }) => {
               {slots.map((slot, index) => (
                 <TimeButton
                   key={index}
-                  time={slot.time}
+                  time={formatTo12Hour(slot.time)}
                   isSelected={selected === slot.time}
                   isPopular={slot.isPopular}
                   onClick={() => onSelect(slot.time, slot.availabilityId)}
@@ -778,7 +805,6 @@ const TimeSelection = ({ timeSlots, selected, onSelect }) => {
     </>
   );
 };
-
 // Patient Details Form Component
 const PatientDetailsForm = ({
   patientDetails,

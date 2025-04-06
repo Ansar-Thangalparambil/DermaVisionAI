@@ -305,7 +305,7 @@ const DermoHome = () => {
                       className={`inline-block px-2 py-1 rounded-full text-xs ${
                         appointment.bookStatus === "Pending"
                           ? "bg-yellow-100 text-yellow-800"
-                          : appointment.bookStatus === "Confirmed"
+                          : appointment.bookStatus === "completed"
                           ? "bg-green-100 text-green-800"
                           : "bg-red-100 text-red-800"
                       }`}
@@ -374,6 +374,12 @@ const DermoHome = () => {
                   <p>
                     <strong>Problem Description:</strong>{" "}
                     {selectedUser.DiesesDescription}
+                  </p>
+                )}
+                {selectedUser.diagonisisResult && (
+                  <p>
+                    <strong>Diagonisis Description:</strong>{" "}
+                    {selectedUser.diagonisisResult}
                   </p>
                 )}
                 {selectedUser.google_meet_link && (

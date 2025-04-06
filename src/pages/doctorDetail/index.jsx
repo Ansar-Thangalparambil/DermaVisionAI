@@ -166,7 +166,7 @@ const DoctorProfilePage = ({ admin = false }) => {
             </div>
           </div>
         </div>
-        {admin && (
+        {/* {admin && (
           <div className="flex items-center justify-center gap-x-2">
             <button className="bg-[#808080] py-[10px] text-sm px-4 text-white rounded-xl cursor-pointer">
               Edit
@@ -175,7 +175,7 @@ const DoctorProfilePage = ({ admin = false }) => {
               Remove User
             </button>
           </div>
-        )}
+        )} */}
       </div>
 
       <div className="shadow-md rounded-3xl bg-white py-2 mt-5">

@@ -4,6 +4,8 @@ import apiClent from "../api/client";
 const RecentAppointments = () => {
   const [appointments, setAppointments] = useState([]);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [selectedPrescription, setSelectedPrescription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dateFilter, setDateFilter] = useState({
@@ -15,11 +17,16 @@ const RecentAppointments = () => {
     const fetchAppointments = async () => {
       setLoading(true);
       try {
-        const response = await apiClent.get("/api/7788/getAppoimets");
+        const response = await apiClent.get("/api/7788/getAppoimets", {
+          headers: {
+            UserID: parseInt(localStorage.getItem("userId")),
+          },
+        });
 
         if (response.data.isSucess) {
-          setAppointments(response.data.data);
-          setFilteredAppointments(response.data.data);
+          setAppointments(response.data.data.list);
+          setFilteredAppointments(response.data.data.list);
+          setPrescriptions(response.data.data.prescription || []);
         } else {
           throw new Error(
             response.data.message || "Failed to fetch appointments"
@@ -115,6 +122,7 @@ const RecentAppointments = () => {
           </span>
         );
       case "cancelled":
+      case "cancel":
         return (
           <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
             Cancelled
@@ -132,6 +140,41 @@ const RecentAppointments = () => {
             {status}
           </span>
         );
+    }
+  };
+
+  // Check if appointment has prescription
+  const hasPrescription = (bookingId) => {
+    return prescriptions.some(
+      (prescription) => prescription.booking_id === bookingId
+    );
+  };
+
+  // Get prescriptions for a booking
+  const getPrescriptionsForBooking = (bookingId) => {
+    return prescriptions.filter(
+      (prescription) => prescription.booking_id === bookingId
+    );
+  };
+
+  // Format prescription date
+  const formatPrescriptionDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Toggle prescription modal
+  const togglePrescription = (bookingId) => {
+    if (selectedPrescription === bookingId) {
+      setSelectedPrescription(null);
+    } else {
+      setSelectedPrescription(bookingId);
     }
   };
 
@@ -305,8 +348,8 @@ const RecentAppointments = () => {
                   </div>
                 </div>
 
-                {appointment.google_meet_link && (
-                  <div className="mt-4">
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {appointment.google_meet_link && (
                     <a
                       href={appointment.google_meet_link}
                       target="_blank"
@@ -329,8 +372,33 @@ const RecentAppointments = () => {
                       </svg>
                       Join Video Consultation
                     </a>
-                  </div>
-                )}
+                  )}
+
+                  {hasPrescription(appointment.Booking_id) && (
+                    <button
+                      onClick={() => togglePrescription(appointment.Booking_id)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200 transition-colors"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      {selectedPrescription === appointment.Booking_id
+                        ? "Hide Prescription"
+                        : "Show Prescription"}
+                    </button>
+                  )}
+                </div>
 
                 {appointment.CancelReason && (
                   <div className="mt-4 p-3 bg-red-50 rounded-md">
@@ -340,6 +408,81 @@ const RecentAppointments = () => {
                     <p className="text-sm text-red-700 mt-1">
                       {appointment.CancelReason}
                     </p>
+                  </div>
+                )}
+
+                {/* Prescription Details */}
+                {selectedPrescription === appointment.Booking_id && (
+                  <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h4 className="text-md font-medium text-green-800 mb-3 flex items-center gap-2">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      Prescription Details
+                    </h4>
+
+                    {getPrescriptionsForBooking(appointment.Booking_id).map(
+                      (prescription, index) => (
+                        <div
+                          key={prescription.prescription_id}
+                          className={`p-3 ${
+                            index > 0
+                              ? "mt-3 pt-3 border-t border-green-200"
+                              : ""
+                          }`}
+                        >
+                          <div className="grid md:grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <p className="text-sm font-medium text-green-700">
+                                Medicine:
+                              </p>
+                              <p className="text-sm text-green-800">
+                                {prescription.medicine_name}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-green-700">
+                                Dosage:
+                              </p>
+                              <p className="text-sm text-green-800">
+                                {prescription.dosage}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-green-700">
+                                Duration:
+                              </p>
+                              <p className="text-sm text-green-800">
+                                {prescription.duration} days
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-green-700">
+                                Notes:
+                              </p>
+                              <p className="text-sm text-green-800">
+                                {prescription.notes}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-xs text-green-600">
+                            Prescribed on:{" "}
+                            {formatPrescriptionDate(prescription.prescribed_at)}
+                          </div>
+                        </div>
+                      )
+                    )}
                   </div>
                 )}
               </div>

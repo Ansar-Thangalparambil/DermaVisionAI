@@ -6,12 +6,6 @@ import { RiFeedbackFill } from "react-icons/ri";
 
 export const SIDE_BAR_ITEMS = [
   {
-    title: "Dashboard",
-    id: 1,
-    icon: TbLayoutDashboardFilled,
-    path: "/",
-  },
-  {
     title: "Users",
     id: 2,
     icon: LuUsers,

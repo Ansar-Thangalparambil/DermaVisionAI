@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Banner from "../../components/banner";
 import apiClent from "../../api/client";
+import SkinDiagnosisChat from "../../components/SkinDiagnosisChat";
 
 const Home = () => {
   const [doctors, setDoctors] = useState([]);
@@ -103,6 +104,7 @@ const Home = () => {
           ))}
         </div>
       </div>
+      <SkinDiagnosisChat />
     </div>
   );
 };
